@@ -32,7 +32,7 @@ android {
         applicationId = "io.github.a13e300.dsf_detector"
         minSdk = 27
         targetSdk = 34
-        versionCode = 3
+        versionCode = 4
         versionName = "1.0.2"
     }
 
@@ -57,6 +57,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    buildFeatures {
+        buildConfig = true
     }
 }
 

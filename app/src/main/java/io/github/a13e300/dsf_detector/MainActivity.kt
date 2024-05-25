@@ -52,6 +52,7 @@ class MainActivity : Activity() {
             Gravity.CENTER
             )
         )
+        setTitle("${getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}")
         setContentView(v)
         handler = Handler(Looper.myLooper()!!)
         doDetectWindowFlags()
