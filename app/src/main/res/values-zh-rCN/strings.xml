@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">禁用安全标志检测器</string>
+    <string name="found">异常</string>
+    <string name="not_found">正常</string>
+    <string name="error">发生了错误</string>
+    <string name="detecting">检测中……</string>
+</resources>

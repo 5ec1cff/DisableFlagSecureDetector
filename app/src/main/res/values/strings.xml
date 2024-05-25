@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">DisableFlagSecureDetector</string>
+    <string name="found">Abnormal</string>
+    <string name="not_found">Normal</string>
+    <string name="error">Error occurred</string>
+    <string name="detecting">Detecting …</string>
+</resources>
