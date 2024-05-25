@@ -1,5 +1,6 @@
 package io.github.a13e300.dsf_detector
 
+import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -14,9 +15,8 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     private lateinit var handler: Handler
     private lateinit var statusView: TextView
     override fun onCreate(savedInstanceState: Bundle?) {
