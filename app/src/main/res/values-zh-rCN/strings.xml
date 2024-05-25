@@ -4,5 +4,6 @@
     <string name="found">异常</string>
     <string name="not_found">正常</string>
     <string name="error">发生了错误</string>
-    <string name="detecting">检测中……</string>
+    <string name="detecting">检测中…</string>
+    <string name="timeout">超时</string>
 </resources>
