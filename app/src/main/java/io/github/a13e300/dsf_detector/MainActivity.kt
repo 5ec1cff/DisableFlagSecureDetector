@@ -54,7 +54,18 @@ class MainActivity : Activity() {
         )
         setContentView(v)
         handler = Handler(Looper.myLooper()!!)
-        doDetect()
+        doDetectWindowFlags()
+        if (state < FINISHED) doDetect()
+    }
+
+    // https://github.com/DerpFest-AOSP/frameworks_base/blob/dc45b5f510c6bf1b64186211cf1c7d41c3003c58/core/java/android/view/Window.java#L1295
+    private fun doDetectWindowFlags() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val attr = window.attributes
+        if (attr.flags and WindowManager.LayoutParams.FLAG_SECURE == 0) {
+            Log.d(TAG, "doDetectWindowFlags: found custom rom")
+            reportStatus(DetectResult.FOUND)
+        }
     }
 
     enum class DetectResult {
