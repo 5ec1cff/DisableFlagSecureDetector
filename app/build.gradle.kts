@@ -33,8 +33,8 @@ android {
         applicationId = "io.github.a13e300.dsf_detector"
         minSdk = 27
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0.2"
+        versionCode = 5
+        versionName = "1.0.3"
     }
 
     buildTypes {
