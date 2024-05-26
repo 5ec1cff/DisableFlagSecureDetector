@@ -93,7 +93,8 @@ class MainActivity : Activity() {
         logd("System Information: ${Build.VERSION.RELEASE} SDK=${Build.VERSION.SDK_INT}")
         setContentView(v)
         handler = Handler(Looper.myLooper()!!)
-        doDetectWindowFlags()
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // doDetectWindowFlags()
     }
 
     private fun copyText() {
@@ -116,16 +117,21 @@ class MainActivity : Activity() {
             val sc = (window.decorView as ViewHidden).viewRootImpl.surfaceControl
             when (Build.VERSION.SDK_INT) {
                 in Build.VERSION_CODES.UPSIDE_DOWN_CAKE..Int.MAX_VALUE -> {
-                    if (ScreenCapture.captureLayers(
-                            ScreenCapture.LayerCaptureArgs.Builder(sc)
-                                .setUid(Process.myUid().toLong())
-                                .build()
-                        ) != null
-                    ) {
-                        loge("doDetectCaptureSelf: found")
-                        updateStatus(DetectResult.FOUND)
+                    val buf = ScreenCapture.captureLayers(
+                        ScreenCapture.LayerCaptureArgs.Builder(sc)
+                            .setUid(Process.myUid().toLong())
+                            .build()
+                    )
+                    if (buf != null) {
+                        logd("doDetectCaptureSelf: found?")
+                        /*
+                        val f = File(filesDir, "a.png")
+                        f.outputStream().use {
+                            buf.asBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+                        }
+                        logd("saved to $f")*/
+                        // updateStatus(DetectResult.FOUND)
                     }
-
                 }
 
                 in Build.VERSION_CODES.S..Build.VERSION_CODES.TIRAMISU -> {
@@ -135,8 +141,8 @@ class MainActivity : Activity() {
                                 .build()
                         ) != null
                     ) {
-                        loge("doDetectCaptureSelf: found")
-                        updateStatus(DetectResult.FOUND)
+                        loge("doDetectCaptureSelf: found?")
+                        // updateStatus(DetectResult.FOUND)
                     }
                 }
 
@@ -156,7 +162,6 @@ class MainActivity : Activity() {
 
     // https://github.com/DerpFest-AOSP/frameworks_base/blob/dc45b5f510c6bf1b64186211cf1c7d41c3003c58/core/java/android/view/Window.java#L1295
     private fun doDetectWindowFlags() {
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val attr = window.attributes
         if (attr.flags and WindowManager.LayoutParams.FLAG_SECURE == 0) {
             logd("doDetectWindowFlags: Found futile DFS!")

@@ -1,5 +1,6 @@
 package android.window;
 
+import android.graphics.Bitmap;
 import android.view.SurfaceControl;
 
 // API 34+
@@ -8,7 +9,15 @@ public class ScreenCapture {
         throw new UnsupportedOperationException("");
     }
 
-    public static class ScreenshotHardwareBuffer {}
+    public static class ScreenshotHardwareBuffer {
+        public boolean containsSecureLayers() {
+            throw new UnsupportedOperationException("");
+        }
+
+        public Bitmap asBitmap() {
+            throw new UnsupportedOperationException("");
+        }
+    }
 
 
     private abstract static class CaptureArgs {
