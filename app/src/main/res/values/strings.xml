@@ -5,4 +5,5 @@
     <string name="error">Error occurred</string>
     <string name="detecting">Detecting …</string>
     <string name="timeout">Timeout</string>
+    <string name="copied">Copied</string>
 </resources>

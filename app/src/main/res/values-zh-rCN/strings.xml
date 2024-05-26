@@ -6,4 +6,5 @@
     <string name="error">发生了错误</string>
     <string name="detecting">检测中…</string>
     <string name="timeout">超时</string>
+    <string name="copied">已复制</string>
 </resources>

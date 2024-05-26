@@ -4,6 +4,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.refine.plugin)
 }
 
 val keystorePropertiesFile: File = rootProject.file("keystore.properties")
@@ -64,4 +65,6 @@ android {
 }
 
 dependencies {
+    implementation(libs.hiddenapibypass)
+    compileOnly(project(":stub"))
 }
