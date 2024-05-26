@@ -89,7 +89,7 @@ class MainActivity : Activity() {
             Gravity.CENTER
         ))
         title = "${getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}"
-        logd("Disable Flag Secure ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        logd("Disable Flag Secure Detector ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         logd("System Information: ${Build.VERSION.RELEASE} SDK=${Build.VERSION.SDK_INT}")
         setContentView(v)
         handler = Handler(Looper.myLooper()!!)
@@ -122,9 +122,8 @@ class MainActivity : Activity() {
                                 .build()
                         ) != null
                     ) {
+                        loge("doDetectCaptureSelf: found")
                         updateStatus(DetectResult.FOUND)
-                    } else {
-                        updateStatus(DetectResult.NOT_FOUND)
                     }
 
                 }
