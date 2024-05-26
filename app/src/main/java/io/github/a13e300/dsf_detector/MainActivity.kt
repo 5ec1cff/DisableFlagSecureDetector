@@ -3,12 +3,25 @@ package io.github.a13e300.dsf_detector
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
+import android.media.ImageReader
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.Gravity
 import android.view.SurfaceControlHidden
+import android.view.View
 import android.view.ViewGroup
 import android.view.ViewHidden
 import android.view.WindowManager
@@ -18,6 +31,15 @@ import android.widget.TextView
 import android.widget.Toast
 import android.window.ScreenCapture
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+
+const val UNINITIALIZED = 0
+const val READER_CREATED = 1
+const val DISPLAY_CREATED = 2
+const val VIEW_ADDED = 3
+const val VIEW_DRAWN = 4
+const val FRAME_DELIVERED = 5
+const val FINISHED = 6
+const val RELEASED = 7
 
 const val TAG = "DisableFlagSecureDetector"
 
@@ -32,6 +54,14 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private var result: DetectResult = DetectResult.DETECTING
     private lateinit var textView: TextView
+
+    private lateinit var handler: Handler
+    private lateinit var wm: WindowManager
+    private lateinit var viewOfVd: View
+    private lateinit var virtualDisplay: VirtualDisplay
+    private lateinit var reader: ImageReader
+    private var state: Int = UNINITIALIZED
+    private var frameCount: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +90,7 @@ class MainActivity : Activity() {
         ))
         title = "${getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}"
         setContentView(v)
+        handler = Handler(Looper.myLooper()!!)
         doDetectWindowFlags()
     }
 
@@ -103,22 +134,22 @@ class MainActivity : Activity() {
                                 .build()
                         ) != null
                     ) {
+                        loge("doDetectCaptureSelf: found")
                         updateStatus(DetectResult.FOUND)
-                    } else {
-                        updateStatus(DetectResult.NOT_FOUND)
                     }
                 }
 
                 else -> {
                     // not available on A11 and below
-                    textView.append("doDetectCaptureSelf: unsupported")
-                    updateStatus(DetectResult.NOT_FOUND)
+                    logd("doDetectCaptureSelf: unsupported")
                 }
             }
         }.onFailure {
-            Log.e(TAG, "doDetectCaptureSelf: ", it)
+            loge("doDetectCaptureSelf: ", it)
             updateStatus(DetectResult.ERROR)
-            textView.text = Log.getStackTraceString(it)
+        }
+        if (result != DetectResult.FOUND) {
+            doDetectVirtualDisplay()
         }
     }
 
@@ -127,9 +158,10 @@ class MainActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val attr = window.attributes
         if (attr.flags and WindowManager.LayoutParams.FLAG_SECURE == 0) {
-            Log.d(TAG, "doDetectWindowFlags: found custom rom")
+            logd("doDetectWindowFlags: Found futile DFS!")
             updateStatus(DetectResult.FOUND)
-            textView.append("Found futile DFS!\n")
+        } else {
+            logd("doDetectWindowFlags: not found")
         }
     }
 
@@ -164,6 +196,148 @@ class MainActivity : Activity() {
                 statusView.setTextColor(getColor(R.color.error_color))
             }
         }
+        if (state > UNINITIALIZED) {
+            state = FINISHED
+            release()
+        }
     }
 
+    private val checkTimeoutRunnable = Runnable {
+        if (state >= FINISHED) return@Runnable
+        logd("check timeout: current state $state")
+        onImageAvailable("last")
+        if (state < FRAME_DELIVERED) updateStatus(DetectResult.TIMEOUT)
+        else if (state < FINISHED) updateStatus(DetectResult.NOT_FOUND)
+    }
+
+    // https://wossoneri.github.io/2018/04/02/[Android]MediaProjection-Screenshot/
+
+    private fun doDetectVirtualDisplay() = kotlin.runCatching {
+        val displayManager = getSystemService(DisplayManager::class.java)
+        reader = ImageReader.newInstance(10, 10, PixelFormat.RGBA_8888, 1)
+        state = READER_CREATED
+        virtualDisplay = displayManager.createVirtualDisplay(
+            "detect", 10, 10, 1, reader.surface, 0
+        )
+        state = DISPLAY_CREATED
+        val ctx = createDisplayContext(virtualDisplay.display)
+        wm = ctx.getSystemService(WindowManager::class.java)
+        viewOfVd = object : View(ctx) {
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                if (state != VIEW_ADDED) return
+                state = VIEW_DRAWN
+                handler.removeCallbacks(checkTimeoutRunnable)
+                handler.postDelayed(checkTimeoutRunnable, 2000)
+                handler.postDelayed({
+                    if (state == VIEW_DRAWN) {
+                        onImageAvailable("draw")
+                    }
+                }, 500)
+            }
+        }.apply {
+            setBackgroundColor(Color.RED)
+        }
+        reader.setOnImageAvailableListener(
+            {
+                onImageAvailable("ImageReader")
+            }, null)
+        wm.addView(viewOfVd, WindowManager.LayoutParams().apply {
+            type = WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION
+            width = 10
+            height = 10
+            x = 0
+            y = 0
+            format = PixelFormat.RGBA_8888
+            title = "detect"
+            flags = WindowManager.LayoutParams.FLAG_SECURE
+        })
+        state = VIEW_ADDED
+        handler.postDelayed(checkTimeoutRunnable, 2000)
+    }.onFailure {
+        updateStatus(DetectResult.ERROR)
+        release()
+    }
+
+    private fun onImageAvailable(reason: String) {
+        if (state >= FINISHED) return
+        logd("onImageAvailable: $reason")
+        kotlin.runCatching { reader.acquireLatestImage() }
+            .onFailure { loge("onImageAvailable: failed to get frame (current frame $frameCount)", it) }
+            .getOrNull()
+            ?.use { img ->
+                runCatching {
+                    val planes = img.planes[0]
+                    val bytes = planes.buffer
+                    val pixelStride = planes.pixelStride
+                    val rowStride = planes.rowStride
+                    val rowPadding = rowStride - pixelStride * 10
+                    val w = 10 + rowPadding / pixelStride
+                    val bitmap = Bitmap.createBitmap(w, 10, Bitmap.Config.ARGB_8888)
+                    bitmap.copyPixelsFromBuffer(bytes)
+                    frameCount += 1
+                    if (bitmap.getPixel(0, 0) == Color.RED) {
+                        loge("onImageAvailable: detected at frame $frameCount ($reason)")
+                        updateStatus(DetectResult.FOUND)
+                    } else {
+                        state = FRAME_DELIVERED
+                        logd("onImageAvailable: not detected at frame $frameCount ($reason)")
+                    }
+                }.onFailure {
+                    updateStatus(DetectResult.ERROR)
+                }
+                return
+            }
+    }
+
+    override fun onDestroy() {
+        release()
+        super.onDestroy()
+    }
+
+    private fun release() {
+        if (state == UNINITIALIZED) {
+            return
+        }
+        if (state < RELEASED) {
+            handler.removeCallbacks(checkTimeoutRunnable)
+            runCatching {
+                if (state >= VIEW_ADDED)
+                    wm.removeViewImmediate(viewOfVd)
+                if (state >= DISPLAY_CREATED)
+                    virtualDisplay.release()
+                if (state >= READER_CREATED)
+                    reader.close()
+            }.onFailure {
+                loge("release failed", it)
+            }.onSuccess {
+                logd("release success")
+            }
+            state = RELEASED
+
+        }
+    }
+
+    private fun logd(info: String) {
+        Log.d(TAG, info)
+        runOnUiThread {
+            textView.append(info)
+            textView.append("\n")
+        }
+    }
+
+    private fun loge(info: String, t: Throwable? = null) {
+        if (t == null) Log.e(TAG, info)
+        else Log.e(TAG, info, t)
+        runOnUiThread {
+            textView.append(SpannableStringBuilder()
+                .append(info, ForegroundColorSpan(Color.RED), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                .append("\n")
+                .apply { if (t != null) {
+                    append(Log.getStackTraceString(t), ForegroundColorSpan(Color.RED), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    append("\n")
+                } }
+            )
+        }
+    }
 }
